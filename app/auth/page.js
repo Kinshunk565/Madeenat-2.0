@@ -126,7 +126,7 @@ export default function AuthPage() {
             <a href="/">
               <img src="/logo.png" alt="Madeenat.com" className="logo-img" />
             </a>
-            <span className="logo-badge">B2B</span>
+            <span className="logo-badge">Supplier</span>
           </div>
 
           <button
@@ -151,7 +151,7 @@ export default function AuthPage() {
           />
 
           <nav className={`nav-links ${mobileMenuOpen ? 'mobile-open' : ''}`}>
-            <a href="/" className="nav-link" onClick={() => setMobileMenuOpen(false)}>Buyer Catalog</a>
+            <a href="/" className="nav-link" onClick={() => setMobileMenuOpen(false)}>Home</a>
           </nav>
         </div>
       </header>
@@ -162,8 +162,8 @@ export default function AuthPage() {
           <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
             <img src="/logo.png" alt="Madeenat.com" style={{ height: '32px', marginBottom: '1rem' }} />
           </div>
-          <h2 className="auth-title">B2B Platform</h2>
-          <p className="auth-subtitle">Supplier & Admin Portal Access</p>
+          <h2 className="auth-title">Supplier Portal</h2>
+          <p className="auth-subtitle">Log in or register to manage your laptop inventory</p>
 
           {/* Tab Switcher */}
           <div className="auth-tab-bar">

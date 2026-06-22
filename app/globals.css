@@ -865,6 +865,26 @@ img {
   flex: 1;
 }
 
+/* Custom scrollbar for modal body to ensure scroll option is visually clear */
+.modal-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.modal-body::-webkit-scrollbar-track {
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+}
+
+.modal-body::-webkit-scrollbar-thumb {
+  background: rgba(242, 101, 34, 0.4);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+}
+
+.modal-body::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}
+
 .modal-footer {
   padding: 1rem 1.5rem;
   padding-bottom: calc(1rem + var(--safe-bottom));

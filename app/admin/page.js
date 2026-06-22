@@ -30,12 +30,12 @@ export default function AdminDashboard() {
     try {
       const res = await fetch('/api/auth/me');
       if (!res.ok) {
-        router.push('/auth');
+        router.push('/admin/login');
         return;
       }
       const data = await res.json();
       if (data.user.role !== 'ADMIN') {
-        router.push('/auth');
+        router.push('/admin/login');
         return;
       }
       setUser(data.user);
@@ -43,7 +43,7 @@ export default function AdminDashboard() {
       // Load all listings
       await fetchAllListings();
     } catch (err) {
-      router.push('/auth');
+      router.push('/admin/login');
     } finally {
       setLoading(false);
     }

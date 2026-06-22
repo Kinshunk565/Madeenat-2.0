@@ -46,6 +46,7 @@ function SupplierDashboard() {
   // Excel Upload State
   const [parsingExcel, setParsingExcel] = useState(false);
   const [excelSuccess, setExcelSuccess] = useState('');
+  const [excelFile, setExcelFile] = useState(null);
 
   // Register Popup State
   const [regEmail, setRegEmail] = useState('');
@@ -74,42 +75,72 @@ function SupplierDashboard() {
   ];
 
   const cpuOptions = [
-    'Intel Core i9-14900HX',
-    'Intel Core i9-13900H',
-    'Intel Core i9-12900H',
-    'Intel Core i9-11980HK',
-    'Intel Core i9-10980HK',
-    'Intel Core i7-14700HX',
-    'Intel Core i7-13700H',
-    'Intel Core i7-12700H',
-    'Intel Core i7-11800H',
-    'Intel Core i7-10750H',
-    'Intel Core i7-9750H',
-    'Intel Core i7-8750H',
-    'Intel Core i5-14500HX',
-    'Intel Core i5-1340P',
-    'Intel Core i5-1240P',
-    'Intel Core i5-1135G7',
-    'Intel Core i5-10210U',
-    'Intel Core i5-8250U',
-    'Intel Core i3-14100',
-    'Intel Core i3-1315U',
-    'Intel Core i3-1215U',
-    'Intel Core i3-1115G4',
-    'Intel Core i3-1005G1',
-    'AMD Ryzen 9 7940HS',
-    'AMD Ryzen 7 7840HS',
-    'AMD Ryzen 5 7540U',
-    'Apple M3 Max',
-    'Apple M3 Pro',
-    'Apple M3',
-    'Apple M2 Max',
-    'Apple M2 Pro',
-    'Apple M2',
-    'Apple M1 Max',
-    'Apple M1 Pro',
+    'Intel Core i3 2nd',
+    'Intel Core i3 3rd',
+    'Intel Core i3 4th',
+    'Intel Core i3 5th',
+    'Intel Core i3 6th',
+    'Intel Core i3 7th',
+    'Intel Core i3 8th',
+    'Intel Core i3 9th',
+    'Intel Core i3 10th',
+    'Intel Core i3 11th',
+    'Intel Core i3 12th',
+    'Intel Core i3 13th',
+    'Intel Core i3 14th',
+    'Intel Core i5 2nd',
+    'Intel Core i5 3rd',
+    'Intel Core i5 4th',
+    'Intel Core i5 5th',
+    'Intel Core i5 6th',
+    'Intel Core i5 7th',
+    'Intel Core i5 8th',
+    'Intel Core i5 9th',
+    'Intel Core i5 10th',
+    'Intel Core i5 11th',
+    'Intel Core i5 12th',
+    'Intel Core i5 13th',
+    'Intel Core i5 14th',
+    'Intel Core i7 2nd',
+    'Intel Core i7 3rd',
+    'Intel Core i7 4th',
+    'Intel Core i7 5th',
+    'Intel Core i7 6th',
+    'Intel Core i7 7th',
+    'Intel Core i7 8th',
+    'Intel Core i7 9th',
+    'Intel Core i7 10th',
+    'Intel Core i7 11th',
+    'Intel Core i7 12th',
+    'Intel Core i7 13th',
+    'Intel Core i7 14th',
+    'Intel Core i9 8th',
+    'Intel Core i9 9th',
+    'Intel Core i9 10th',
+    'Intel Core i9 11th',
+    'Intel Core i9 12th',
+    'Intel Core i9 13th',
+    'Intel Core i9 14th',
+    'Intel Core Ultra 5',
+    'Intel Core Ultra 7',
+    'Intel Core Ultra 9',
+    'AMD Ryzen 3',
+    'AMD Ryzen 5',
+    'AMD Ryzen 7',
+    'AMD Ryzen 9',
     'Apple M1',
-    'Other CPU Spec'
+    'Apple M1 Pro',
+    'Apple M1 Max',
+    'Apple M2',
+    'Apple M2 Pro',
+    'Apple M2 Max',
+    'Apple M3',
+    'Apple M3 Pro',
+    'Apple M3 Max',
+    'Apple M4',
+    'Apple M4 Pro',
+    'Apple M4 Max',
+    'Other CPU'
   ];
 
   const ramOptions = ['8 GB', '16 GB', '24 GB', '32 GB', '48 GB', '64 GB', '96 GB', '128 GB'];
@@ -239,50 +270,9 @@ function SupplierDashboard() {
     const file = e.target.files[0];
     if (!file) return;
 
-    setParsingExcel(true);
-    setExcelSuccess('');
+    setExcelFile(file);
+    setExcelSuccess(`File selected: ${file.name}`);
     setFormError('');
-
-    const uploadData = new FormData();
-    uploadData.append('file', file);
-
-    try {
-      const res = await fetch('/api/supplier/parse-excel', {
-        method: 'POST',
-        body: uploadData,
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        setFormError(data.error || 'Failed to parse Excel file.');
-        return;
-      }
-
-      // Map parsed specs to brand state
-      let detectedBrand = '';
-      if (data.specs.modelId) {
-        // Fallback checks
-        if (data.specs.modelId === '4') detectedBrand = 'HP';
-        else if (data.specs.modelId === '2') detectedBrand = 'Apple';
-        else if (data.specs.modelId === '1' || data.specs.modelId === '9') detectedBrand = 'Dell';
-        else if (data.specs.modelId === '3' || data.specs.modelId === '10') detectedBrand = 'Lenovo';
-      }
-
-      setFormData((prev) => ({
-        ...prev,
-        brand: detectedBrand || prev.brand,
-        modelName: 'Spectre x360 16', // Autofilled example
-        cpu: data.specs.cpu || prev.cpu,
-        gpu: 'RTX 4060', // GPU manual input autofill
-        quantity: data.specs.quantity || prev.quantity,
-      }));
-
-      setExcelSuccess(`AI parsed ${data.rowCount} rows. Fields have been prefilled from mapped inventory details.`);
-    } catch (err) {
-      setFormError('Error uploading and parsing Excel file.');
-    } finally {
-      setParsingExcel(false);
-    }
   };
 
   const handleFormSubmit = async (e) => {
@@ -291,34 +281,56 @@ function SupplierDashboard() {
     setFormSuccess('');
 
     // Form Validations
-    if (!formData.brand) {
-      setFormError('Please select a laptop brand.');
-      return;
-    }
+    if (formData.category === 'USED_LAPTOP') {
+      if (!formData.brand) {
+        setFormError('Please select a laptop brand.');
+        return;
+      }
 
-    if (formData.brand === 'Other' && !formData.customBrand.trim()) {
-      setFormError('Please enter the custom brand name.');
-      return;
-    }
+      if (formData.brand === 'Other' && !formData.customBrand.trim()) {
+        setFormError('Please enter the custom brand name.');
+        return;
+      }
 
-    if (!formData.modelName.trim()) {
-      setFormError('Please enter the model name.');
-      return;
-    }
+      if (!formData.modelName.trim()) {
+        setFormError('Please enter the model name.');
+        return;
+      }
 
-    if (!formData.cpu) {
-      setFormError('Please select a CPU specification.');
-      return;
-    }
+      if (!formData.cpu) {
+        setFormError('Please select a CPU specification.');
+        return;
+      }
 
-    if (!formData.gpu.trim()) {
-      setFormError('Please enter the graphics details.');
-      return;
-    }
+      if (!formData.ram) {
+        setFormError('Please select RAM capacity.');
+        return;
+      }
 
-    if (!formData.quantity || parseInt(formData.quantity) <= 0) {
-      setFormError('Please enter a valid quantity.');
-      return;
+      if (!formData.ssd) {
+        setFormError('Please select SSD storage.');
+        return;
+      }
+
+      if (!formData.gpu.trim()) {
+        setFormError('Please enter the graphics details.');
+        return;
+      }
+
+      if (!formData.quantity || parseInt(formData.quantity) <= 0) {
+        setFormError('Please enter a valid quantity.');
+        return;
+      }
+
+      if (!formData.acceptTerms) {
+        setFormError('You must accept the terms and conditions.');
+        return;
+      }
+    } else {
+      if (!excelFile) {
+        setFormError('Please upload an Excel or CSV file.');
+        return;
+      }
     }
 
     // Phone Number strict B2B UAE format check (+971 only)
@@ -333,40 +345,50 @@ function SupplierDashboard() {
       return;
     }
 
-    if (!formData.acceptTerms) {
-      setFormError('You must accept the terms and conditions.');
-      return;
-    }
-
     setSubmitting(true);
 
-    const submitBody = {
-      brand: formData.brand === 'Other' ? formData.customBrand.trim() : formData.brand,
-      modelName: formData.modelName.trim(),
-      cpu: formData.cpu,
-      ram: formData.ram || null,
-      ssd: formData.ssd || null,
-      gpu: formData.gpu.trim(),
-      quantity: parseInt(formData.quantity, 10),
-      phoneNumber: formData.phoneNumber.trim(),
-      companyName: formData.companyName.trim(),
-      acceptTerms: formData.acceptTerms,
-      category: formData.category,
-    };
-
-    if (isGuest) {
-      submitBody.tempSessionToken = getGuestToken();
-    }
-
+    let res;
     try {
-      // 1. Check/Create LaptopModel in DB matching brand & modelName
-      // To satisfy foreign key relation, we hit a dynamic matching step.
-      // We will first register the listing via supplier POST, which has been updated to handle brand/model matching.
-      const res = await fetch('/api/supplier/listings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(submitBody),
-      });
+      if (formData.category === 'USED_LIST') {
+        const uploadData = new FormData();
+        uploadData.append('file', excelFile);
+        uploadData.append('category', 'USED_LIST');
+        uploadData.append('phoneNumber', formData.phoneNumber.trim());
+        uploadData.append('companyName', formData.companyName.trim());
+        uploadData.append('acceptTerms', 'true'); // Auto-accepted on list upload
+        if (isGuest) {
+          uploadData.append('tempSessionToken', getGuestToken());
+        }
+
+        res = await fetch('/api/supplier/listings', {
+          method: 'POST',
+          body: uploadData,
+        });
+      } else {
+        const submitBody = {
+          brand: formData.brand === 'Other' ? formData.customBrand.trim() : formData.brand,
+          modelName: formData.modelName.trim(),
+          cpu: formData.cpu,
+          ram: formData.ram,
+          ssd: formData.ssd,
+          gpu: formData.gpu.trim(),
+          quantity: parseInt(formData.quantity, 10),
+          phoneNumber: formData.phoneNumber.trim(),
+          companyName: formData.companyName.trim(),
+          acceptTerms: formData.acceptTerms,
+          category: 'USED_LAPTOP',
+        };
+
+        if (isGuest) {
+          submitBody.tempSessionToken = getGuestToken();
+        }
+
+        res = await fetch('/api/supplier/listings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(submitBody),
+        });
+      }
 
       const data = await res.json();
 
@@ -376,7 +398,7 @@ function SupplierDashboard() {
         return;
       }
 
-      setFormSuccess('Stock listing submitted successfully. Awaiting admin review.');
+      setFormSuccess('Stock listing submitted successfully. Awaiting admin approval.');
       
       // Refresh list
       await fetchListings(isGuest ? getGuestToken() : null, isGuest);
@@ -401,6 +423,7 @@ function SupplierDashboard() {
           quantity: '',
           acceptTerms: false,
         }));
+        setExcelFile(null);
         setIsModalOpen(false);
         setFormSuccess('');
         setExcelSuccess('');
@@ -831,233 +854,250 @@ function SupplierDashboard() {
                     </div>
                   </div>
 
-                  {/* Excel Upload Area */}
-                  {formData.category === 'USED_LIST' && (
-                    <div className="form-group">
-                      <label className="form-label">Bulk Excel Import (Autofills Configs)</label>
-                      <label className="file-upload-container">
-                        <input
-                          id="excel-file-picker"
-                          type="file"
-                          accept=".xlsx,.xls,.csv"
-                          className="file-upload-input"
-                          onChange={handleExcelUpload}
-                        />
-                        <div className="file-upload-icon">
-                          <svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
+                  {formData.category === 'USED_LIST' ? (
+                    <>
+                      {/* Excel Upload Area */}
+                      <div className="form-group">
+                        <label className="form-label">Excel / CSV File</label>
+                        <label className="file-upload-container">
+                          <input
+                            id="excel-file-picker"
+                            type="file"
+                            accept=".xlsx,.xls,.csv"
+                            className="file-upload-input"
+                            onChange={handleExcelUpload}
+                          />
+                          <div className="file-upload-icon">
+                            <svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                          </div>
+                          <span className="file-upload-text">
+                            Click to Upload Excel / CSV Sheet
+                          </span>
+                          <div className="btn btn-secondary" style={{ marginTop: '1rem', minHeight: '36px', padding: '0.5rem 1.5rem', fontSize: '0.85rem' }}>
+                            Upload
+                          </div>
+                        </label>
+                      </div>
+
+                      {/* Phone (UAE +971 validation) & Company details */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.25fr', gap: '1rem' }}>
+                        <div className="form-group">
+                          <label className="form-label" htmlFor="phoneNumber">Phone No. (+971 UAE only)</label>
+                          <input
+                            id="phoneNumber"
+                            name="phoneNumber"
+                            type="tel"
+                            placeholder="+971501234567"
+                            className="form-control"
+                            required
+                            value={formData.phoneNumber}
+                            onChange={handleFormChange}
+                          />
                         </div>
-                        <span className="file-upload-text">
-                          {parsingExcel ? 'AI reading sheet configurations...' : 'Click to Upload Excel / CSV Inventory Sheet'}
+
+                        <div className="form-group">
+                          <label className="form-label" htmlFor="companyName">Supplier Company Name</label>
+                          <input
+                            id="companyName"
+                            name="companyName"
+                            type="text"
+                            className="form-control"
+                            required
+                            value={formData.companyName}
+                            onChange={handleFormChange}
+                          />
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {/* Brand Selector Dropdown */}
+                      <div className="form-group">
+                        <label className="form-label" htmlFor="brand">Brand Name</label>
+                        <select
+                          id="brand"
+                          name="brand"
+                          className="form-control"
+                          required
+                          value={formData.brand}
+                          onChange={handleFormChange}
+                        >
+                          <option value="">-- Select Laptop Brand --</option>
+                          {brandOptions.map((b) => (
+                            <option key={b} value={b}>{b}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Custom Brand Manual Input */}
+                      {formData.brand === 'Other' && (
+                        <div className="form-group">
+                          <label className="form-label" htmlFor="customBrand">Custom Brand Name</label>
+                          <input
+                            id="customBrand"
+                            name="customBrand"
+                            type="text"
+                            placeholder="e.g. Microsoft"
+                            className="form-control"
+                            required
+                            value={formData.customBrand}
+                            onChange={handleFormChange}
+                          />
+                        </div>
+                      )}
+
+                      {/* Model Name Input (Manual entry only) */}
+                      <div className="form-group">
+                        <label className="form-label" htmlFor="modelName">Model Name</label>
+                        <input
+                          id="modelName"
+                          name="modelName"
+                          type="text"
+                          placeholder="e.g. Latitude 5480"
+                          className="form-control"
+                          required
+                          value={formData.modelName}
+                          onChange={handleFormChange}
+                        />
+                      </div>
+
+                      {/* CPU Dropdown Selector */}
+                      <div className="form-group">
+                        <label className="form-label" htmlFor="cpu">CPU Specs</label>
+                        <select
+                          id="cpu"
+                          name="cpu"
+                          className="form-control"
+                          required
+                          value={formData.cpu}
+                          onChange={handleFormChange}
+                        >
+                          <option value="">-- Select CPU --</option>
+                          {cpuOptions.map((opt) => (
+                            <option key={opt} value={opt}>{opt}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* RAM Dropdown (Required) */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div className="form-group">
+                          <label className="form-label" htmlFor="ram">RAM Capacity</label>
+                          <select
+                            id="ram"
+                            name="ram"
+                            className="form-control"
+                            required
+                            value={formData.ram}
+                            onChange={handleFormChange}
+                          >
+                            <option value="">-- Select RAM --</option>
+                            {ramOptions.map((opt) => (
+                              <option key={opt} value={opt}>{opt}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* SSD Dropdown (Required) */}
+                        <div className="form-group">
+                          <label className="form-label" htmlFor="ssd">SSD Storage</label>
+                          <select
+                            id="ssd"
+                            name="ssd"
+                            className="form-control"
+                            required
+                            value={formData.ssd}
+                            onChange={handleFormChange}
+                          >
+                            <option value="">-- Select SSD --</option>
+                            {ssdOptions.map((opt) => (
+                              <option key={opt} value={opt}>{opt}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Graphics Manual Input & Quantity */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '1rem' }}>
+                        <div className="form-group">
+                          <label className="form-label" htmlFor="gpu">Graphics</label>
+                          <input
+                            id="gpu"
+                            name="gpu"
+                            type="text"
+                            placeholder="e.g. RTX 3060"
+                            className="form-control"
+                            required
+                            value={formData.gpu}
+                            onChange={handleFormChange}
+                          />
+                        </div>
+
+                        <div className="form-group">
+                          <label className="form-label" htmlFor="quantity">Quantity</label>
+                          <input
+                            id="quantity"
+                            name="quantity"
+                            type="number"
+                            min="1"
+                            placeholder="Qty"
+                            className="form-control"
+                            required
+                            value={formData.quantity}
+                            onChange={handleFormChange}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Phone (UAE +971 validation) & Company details */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.25fr', gap: '1rem' }}>
+                        <div className="form-group">
+                          <label className="form-label" htmlFor="phoneNumber">Phone No. (+971 UAE only)</label>
+                          <input
+                            id="phoneNumber"
+                            name="phoneNumber"
+                            type="tel"
+                            placeholder="+971501234567"
+                            className="form-control"
+                            required
+                            value={formData.phoneNumber}
+                            onChange={handleFormChange}
+                          />
+                        </div>
+
+                        <div className="form-group">
+                          <label className="form-label" htmlFor="companyName">Supplier Company Name</label>
+                          <input
+                            id="companyName"
+                            name="companyName"
+                            type="text"
+                            className="form-control"
+                            required
+                            value={formData.companyName}
+                            onChange={handleFormChange}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Terms */}
+                      <div className="form-checkbox-wrapper">
+                        <input
+                          id="acceptTerms"
+                          name="acceptTerms"
+                          type="checkbox"
+                          className="form-checkbox"
+                          required
+                          checked={formData.acceptTerms}
+                          onChange={handleFormChange}
+                        />
+                        <span className="terms-text">
+                          I accept the <span className="terms-link" onClick={() => alert('Terms of Service: You certify that the laptop stock configurations entered are precise, and you will process bulk WhatsApp leads generated through Madeenat.com fairly.')}>Terms and Conditions</span> of stock submission.
                         </span>
-                        <span className="file-upload-subtext">The parser maps Laptop Brand, Models, CPUs, Memory, Storage, and counts.</span>
-                      </label>
-                      <button
-                        type="button"
-                        id="autofill-sample-list-btn"
-                        className="btn btn-secondary"
-                        style={{ width: '100%', padding: '0.45rem', fontSize: '0.8rem', marginTop: '-0.75rem', marginBottom: '1rem' }}
-                        onClick={() => {
-                          setFormData((prev) => ({
-                            ...prev,
-                            brand: 'HP',
-                            modelName: 'Spectre x360 16',
-                            cpu: 'Intel Core i7-13700H',
-                            ram: '32 GB',
-                            ssd: '1 TB',
-                            gpu: 'NVIDIA GeForce RTX 4060',
-                            quantity: '25',
-                          }));
-                          setExcelSuccess('AI parsed 1 rows. Mapped spec configurations pre-filled successfully.');
-                        }}
-                      >
-                        AI Auto-Fill with Mock Sheet Data (Test Mode)
-                      </button>
-                    </div>
+                      </div>
+                    </>
                   )}
-
-                  {/* Brand Selector Dropdown */}
-                  <div className="form-group">
-                    <label className="form-label" htmlFor="brand">Brand Name</label>
-                    <select
-                      id="brand"
-                      name="brand"
-                      className="form-control"
-                      required
-                      value={formData.brand}
-                      onChange={handleFormChange}
-                    >
-                      <option value="">-- Select Laptop Brand --</option>
-                      {brandOptions.map((b) => (
-                        <option key={b} value={b}>{b}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Custom Brand Manual Input */}
-                  {formData.brand === 'Other' && (
-                    <div className="form-group">
-                      <label className="form-label" htmlFor="customBrand">Custom Brand Name</label>
-                      <input
-                        id="customBrand"
-                        name="customBrand"
-                        type="text"
-                        placeholder="e.g. Microsoft"
-                        className="form-control"
-                        required
-                        value={formData.customBrand}
-                        onChange={handleFormChange}
-                      />
-                    </div>
-                  )}
-
-                  {/* Model Name Input (Manual entry only) */}
-                  <div className="form-group">
-                    <label className="form-label" htmlFor="modelName">Model Name</label>
-                    <input
-                      id="modelName"
-                      name="modelName"
-                      type="text"
-                      placeholder="e.g. Latitude 5480"
-                      className="form-control"
-                      required
-                      value={formData.modelName}
-                      onChange={handleFormChange}
-                    />
-                  </div>
-
-                  {/* CPU Dropdown Selector */}
-                  <div className="form-group">
-                    <label className="form-label" htmlFor="cpu">CPU Specs</label>
-                    <select
-                      id="cpu"
-                      name="cpu"
-                      className="form-control"
-                      required
-                      value={formData.cpu}
-                      onChange={handleFormChange}
-                    >
-                      <option value="">-- Select CPU --</option>
-                      {cpuOptions.map((opt) => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* RAM Dropdown (Optional) */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                    <div className="form-group">
-                      <label className="form-label" htmlFor="ram">RAM Capacity (Optional)</label>
-                      <select
-                        id="ram"
-                        name="ram"
-                        className="form-control"
-                        value={formData.ram}
-                        onChange={handleFormChange}
-                      >
-                        <option value="">-- Optional --</option>
-                        {ramOptions.map((opt) => (
-                          <option key={opt} value={opt}>{opt}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* SSD Dropdown (Optional) */}
-                    <div className="form-group">
-                      <label className="form-label" htmlFor="ssd">SSD Storage (Optional)</label>
-                      <select
-                        id="ssd"
-                        name="ssd"
-                        className="form-control"
-                        value={formData.ssd}
-                        onChange={handleFormChange}
-                      >
-                        <option value="">-- Optional --</option>
-                        {ssdOptions.map((opt) => (
-                          <option key={opt} value={opt}>{opt}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Graphics Manual Input & Quantity */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '1rem' }}>
-                    <div className="form-group">
-                      <label className="form-label" htmlFor="gpu">Graphics</label>
-                      <input
-                        id="gpu"
-                        name="gpu"
-                        type="text"
-                        placeholder="e.g. RTX 3060"
-                        className="form-control"
-                        required
-                        value={formData.gpu}
-                        onChange={handleFormChange}
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label className="form-label" htmlFor="quantity">Quantity</label>
-                      <input
-                        id="quantity"
-                        name="quantity"
-                        type="number"
-                        min="1"
-                        placeholder="Qty"
-                        className="form-control"
-                        required
-                        value={formData.quantity}
-                        onChange={handleFormChange}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Phone (UAE +971 validation) & Company details */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.25fr', gap: '1rem' }}>
-                    <div className="form-group">
-                      <label className="form-label" htmlFor="phoneNumber">Phone No. (+971 UAE only)</label>
-                      <input
-                        id="phoneNumber"
-                        name="phoneNumber"
-                        type="tel"
-                        placeholder="+971501234567"
-                        className="form-control"
-                        required
-                        value={formData.phoneNumber}
-                        onChange={handleFormChange}
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label className="form-label" htmlFor="companyName">Supplier Company Name</label>
-                      <input
-                        id="companyName"
-                        name="companyName"
-                        type="text"
-                        className="form-control"
-                        required
-                        value={formData.companyName}
-                        onChange={handleFormChange}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Terms */}
-                  <div className="form-checkbox-wrapper">
-                    <input
-                      id="acceptTerms"
-                      name="acceptTerms"
-                      type="checkbox"
-                      className="form-checkbox"
-                      required
-                      checked={formData.acceptTerms}
-                      onChange={handleFormChange}
-                    />
-                    <span className="terms-text">
-                      I accept the <span className="terms-link" onClick={() => alert('Terms of Service: You certify that the laptop stock configurations entered are precise, and you will process bulk WhatsApp leads generated through Madeenat.com fairly.')}>Terms and Conditions</span> of stock submission.
-                    </span>
-                  </div>
                 </div>
 
                 <div className="modal-footer">
@@ -1075,7 +1115,7 @@ function SupplierDashboard() {
                     className="btn btn-primary"
                     disabled={submitting}
                   >
-                    {submitting ? 'Submitting...' : 'Submit to Queue'}
+                    {submitting ? 'Submitting...' : 'Submit for Approval'}
                   </button>
                 </div>
               </form>

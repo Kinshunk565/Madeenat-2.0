@@ -5,59 +5,49 @@ import { useRouter } from 'next/navigation';
 
 export default function BuyerPortal() {
   const router = useRouter();
-  const [groupedCatalog, setGroupedCatalog] = useState({});
-  const [brandsList, setBrandsList] = useState([]);
-  const [topSearched, setTopSearched] = useState([]);
+  const [listings, setListings] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedModel, setSelectedModel] = useState(null);
-  const [modelListings, setModelListings] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [listingsLoading, setListingsLoading] = useState(false);
   const [user, setUser] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  // Toggle View All Models state (default false, curation mode)
-  const [showAllModels, setShowAllModels] = useState(false);
-  // Expanded state for accordion brands
-  const [expandedBrands, setExpandedBrands] = useState({});
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 15;
 
   useEffect(() => {
+    // Check if query param exists in URL
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const query = params.get('query');
+      if (query) {
+        setSearchQuery(query);
+      }
+    }
     fetchCatalog();
     checkSession();
   }, []);
 
-  // Close mobile menu on route
+  // Log visible listings as VIEWS when page changes or query changes
   useEffect(() => {
-    if (mobileMenuOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
+    if (listings.length > 0) {
+      logVisibleImpressions();
     }
-    return () => { document.body.style.overflow = ''; };
-  }, [mobileMenuOpen]);
+  }, [currentPage, searchQuery, listings]);
 
   const fetchCatalog = async () => {
     setLoading(true);
     try {
       const res = await fetch('/api/catalog');
       const data = await res.json();
-      if (data.groupedByBrand) {
-        setGroupedCatalog(data.groupedByBrand);
-        setTopSearched(data.topSearchedModels || []);
-
-        // Predefined B2B brand ordering (alphabetical order, 'Other' last)
-        const brandOrder = ['Acer', 'Apple', 'Asus', 'Dell', 'HP', 'Lenovo', 'Panasonic', 'Samsung', 'Toshiba', 'Other'];
-        
-        // Filter brands that actually have models in our catalog
-        const activeBrands = brandOrder.filter((brand) => !!data.groupedByBrand[brand]);
-        setBrandsList(activeBrands);
-
-        // Initialize all active brands as expanded by default
-        const initialExpanded = {};
-        activeBrands.forEach((b) => {
-          initialExpanded[b] = true;
-        });
-        setExpandedBrands(initialExpanded);
+      if (data.laptopModels) {
+        // Flatten approved listings associated with matched laptop models
+        const flatListings = data.laptopModels.flatMap((model) => 
+          (model.listings || []).map((listing) => ({
+            ...listing,
+            modelName: model.name,
+            brandName: model.brand,
+          }))
+        );
+        setListings(flatListings);
       }
     } catch (err) {
       console.error('Failed to load catalog:', err);
@@ -78,45 +68,25 @@ export default function BuyerPortal() {
     }
   };
 
-  const toggleBrand = (brand) => {
-    setExpandedBrands((prev) => ({
-      ...prev,
-      [brand]: !prev[brand],
-    }));
-  };
+  const logVisibleImpressions = async () => {
+    const filtered = getFilteredListings();
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const visibleListings = filtered.slice(startIndex, startIndex + itemsPerPage);
+    const visibleIds = visibleListings.map((l) => l.id);
 
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    if (searchQuery.trim() !== '') {
-      router.push(`/search?query=${encodeURIComponent(searchQuery.trim())}`);
-    }
-  };
+    if (visibleIds.length === 0) return;
 
-  const handleSelectModel = async (model) => {
-    setSelectedModel(model);
-    setListingsLoading(true);
     try {
-      const res = await fetch(`/api/catalog/listings?modelId=${model.id}`);
-      const data = await res.json();
-      if (data.listings) {
-        setModelListings(data.listings);
-        // Log view tracking event for selected model listing details
-        const listingIds = data.listings.map(l => l.id);
-        if (listingIds.length > 0) {
-          fetch('/api/tracking/event', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ listingIds, eventType: 'VIEW' }),
-          });
-        }
-      } else {
-        setModelListings([]);
-      }
+      await fetch('/api/tracking/event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          listingIds: visibleIds,
+          eventType: 'VIEW',
+        }),
+      });
     } catch (err) {
-      console.error('Failed to load listings:', err);
-      setModelListings([]);
-    } finally {
-      setListingsLoading(false);
+      console.error('Failed to log listing impressions:', err);
     }
   };
 
@@ -135,7 +105,7 @@ export default function BuyerPortal() {
       console.error('Failed to log click event:', err);
     }
 
-    // 2. Sanitize supplier phone to start with 971 only (no spaces, dashes, or plus signs)
+    // 2. Sanitize supplier phone to start with 971 only
     let sanitizedPhone = listing.phoneNumber.replace(/[+\s-()]/g, '');
     if (!sanitizedPhone.startsWith('971')) {
       if (sanitizedPhone.startsWith('0')) {
@@ -145,10 +115,42 @@ export default function BuyerPortal() {
       }
     }
 
-    // 3. Construct WhatsApp API link according to specification
-    const autoMessage = `Hi! what is the best price of ${selectedModel.name}? (Enquiry coming from www.madeenat.com)`;
+    // 3. Construct WhatsApp API link
+    const autoMessage = `Hi! what is the best price of ${listing.modelName}? (Enquiry coming from www.madeenat.com)`;
     const whatsappUrl = `https://api.whatsapp.com/send/?phone=${sanitizedPhone}&text=${encodeURIComponent(autoMessage)}&type=phone_number&app_absent=0`;
     window.open(whatsappUrl, '_blank');
+  };
+
+  const getFilteredListings = () => {
+    const query = searchQuery.toLowerCase().trim();
+    if (!query) return listings;
+    return listings.filter((l) => (
+      l.brandName.toLowerCase().includes(query) ||
+      l.modelName.toLowerCase().includes(query) ||
+      (l.cpu && l.cpu.toLowerCase().includes(query)) ||
+      (l.ram && l.ram.toLowerCase().includes(query)) ||
+      (l.ssd && l.ssd.toLowerCase().includes(query)) ||
+      (l.gpu && l.gpu.toLowerCase().includes(query)) ||
+      (l.companyName && l.companyName.toLowerCase().includes(query))
+    ));
+  };
+
+  const handleSearchChange = (e) => {
+    setSearchQuery(e.target.value);
+    setCurrentPage(1); // Reset to page 1 on search
+  };
+
+  // Pagination calculations
+  const filteredListings = getFilteredListings();
+  const totalPages = Math.ceil(filteredListings.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedListings = filteredListings.slice(startIndex, startIndex + itemsPerPage);
+
+  const handlePageChange = (pageNumber) => {
+    if (pageNumber >= 1 && pageNumber <= totalPages) {
+      setCurrentPage(pageNumber);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
 
   return (
@@ -160,7 +162,6 @@ export default function BuyerPortal() {
             <a href="/">
               <img src="/logo.png" alt="Madeenat.com" className="logo-img" id="platform-logo" />
             </a>
-            <span className="logo-badge">B2B</span>
           </div>
 
           {/* Mobile hamburger */}
@@ -195,7 +196,6 @@ export default function BuyerPortal() {
             >
               Add Your Product
             </button>
-            <a href="/" className="nav-link active" onClick={() => setMobileMenuOpen(false)}>Buyer Catalog</a>
             {user ? (
               <a href="/supplier" className="btn btn-primary" id="nav-supplier-dash" onClick={() => setMobileMenuOpen(false)}>Supplier Portal</a>
             ) : (
@@ -207,121 +207,73 @@ export default function BuyerPortal() {
 
       {/* Main Content */}
       <main className="main-content">
-        {/* Hero Section */}
-        <section className="hero-section">
-          <span className="hero-eyebrow">
+        {/* Hero / Header Title */}
+        <section className="hero-section" style={{ padding: '2rem 1.5rem 1.5rem', textAlign: 'center' }}>
+          <h2 className="hero-title" id="hero-heading" style={{ fontSize: '2.2rem', fontWeight: '800', background: 'linear-gradient(135deg, var(--text-primary) 0%, rgba(242, 101, 34, 0.8) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', marginBottom: '1.5rem' }}>
             UAE's Trusted B2B Marketplace
-          </span>
-          <h2 className="hero-title" id="hero-heading">Source Laptop Stock in Bulk</h2>
-          <p className="hero-subtitle">
-            Instantly search real-time wholesale laptops. View configurations and negotiate directly with verified suppliers via automated WhatsApp enquiries.
-          </p>
+          </h2>
 
-          {/* Google-like Search Bar (Redirects to Search Results Page) */}
-          <div className="search-container" style={{ marginBottom: '2.5rem' }}>
-            <form onSubmit={handleSearchSubmit} id="homepage-search-form">
-              <div className="search-input-wrapper">
-                <span className="search-icon">
-                  <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          {/* Search Bar */}
+          <div className="search-container" style={{ marginBottom: '1.5rem' }}>
+            <div className="search-input-wrapper">
+              <span className="search-icon">
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </span>
+              <input
+                id="catalog-search-bar"
+                type="text"
+                className="search-input"
+                placeholder="Search by model, brand, processor, memory..."
+                value={searchQuery}
+                onChange={handleSearchChange}
+              />
+              {searchQuery && (
+                <button
+                  id="clear-search-btn"
+                  type="button"
+                  className="search-clear-btn"
+                  onClick={() => { setSearchQuery(''); setCurrentPage(1); }}
+                >
+                  <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                   </svg>
-                </span>
-                <input
-                  id="catalog-search-bar"
-                  type="text"
-                  className="search-input"
-                  placeholder="Search by laptop brand, model or spec..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-                {searchQuery && (
-                  <button
-                    id="clear-search-btn"
-                    type="button"
-                    className="search-clear-btn"
-                    onClick={() => setSearchQuery('')}
-                  >
-                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                )}
-              </div>
-            </form>
-          </div>
-
-          <div className="hero-cta-group">
-            <button
-              id="hero-add-product-btn"
-              className="btn btn-primary"
-              onClick={() => router.push('/supplier?openSubmit=true')}
-            >
-              <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-              </svg>
-              Add Your Product
-            </button>
-            <button
-              id="view-all-models-link"
-              className="btn btn-secondary"
-              onClick={() => setShowAllModels(true)}
-            >
-              View All Models
-            </button>
+                </button>
+              )}
+            </div>
           </div>
         </section>
 
-        {/* Listings Drawer */}
-        {selectedModel && (
-          <section className="listings-panel" id="listings-panel">
-            <div className="panel-header">
-              <div>
-                <span className="card-brand">{selectedModel.brand}</span>
-                <h3 className="panel-title">{selectedModel.name}</h3>
-              </div>
-              <button
-                id="close-panel-btn"
-                className="close-panel-btn"
-                onClick={() => setSelectedModel(null)}
-              >
-                <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+        {/* Listings Section */}
+        <section className="listings-panel" style={{ marginTop: '0', animation: 'none' }}>
+          {loading ? (
+            <p className="text-center" style={{ padding: '4rem 0' }}>Loading stock listings...</p>
+          ) : paginatedListings.length === 0 ? (
+            <div className="empty-state">
+              <p>No laptop listings available matching your search.</p>
             </div>
-
-            {listingsLoading ? (
-              <p className="text-center" style={{ padding: '2rem' }}>Loading supplier listings...</p>
-            ) : modelListings.length === 0 ? (
-              <div className="empty-state" id="no-listings-message">
-                <p>No suppliers currently have this model in stock. Check back later or search another model.</p>
-              </div>
-            ) : (
+          ) : (
+            <div>
               <div className="listings-table-container">
                 <table className="listings-table">
                   <thead>
                     <tr>
-                      <th>Supplier Details</th>
+                      <th>Laptop details</th>
                       <th>Specifications</th>
-                      <th>Quantity Available</th>
-                      <th>Direct Enquiry</th>
+                      <th>Quantity</th>
+                      <th>Supplier</th>
+                      <th>Action</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {modelListings.map((listing) => (
+                    {paginatedListings.map((listing) => (
                       <tr key={listing.id} className="listing-row" id={`listing-${listing.id}`}>
-                        <td data-label="Supplier">
-                          <div className="supplier-info">
-                            <span className="supplier-company">{listing.companyName}</span>
-                            <span className="supplier-phone">{listing.phoneNumber}</span>
-                            {listing.category === 'USED_LIST' && (
-                              <span style={{ fontSize: '0.75rem', color: 'var(--warning)', marginTop: '0.15rem' }}>
-                                Bulk List Submission
-                              </span>
-                            )}
-                          </div>
+                        <td data-label="Laptop details" style={{ fontWeight: '600' }}>
+                          <span className="card-brand" style={{ display: 'block', marginBottom: '0.15rem' }}>{listing.brandName}</span>
+                          {listing.modelName}
                         </td>
-                        <td data-label="Specs">
+                        <td data-label="Specifications">
                           <div className="listing-specs">
                             <span className="spec-pill" title="CPU">{listing.cpu}</span>
                             {listing.ram && <span className="spec-pill" title="RAM">{listing.ram}</span>}
@@ -334,7 +286,18 @@ export default function BuyerPortal() {
                             {listing.quantity} units
                           </span>
                         </td>
-                        <td data-label="Enquiry">
+                        <td data-label="Supplier">
+                          <div className="supplier-info">
+                            <span className="supplier-company">{listing.companyName}</span>
+                            <span className="supplier-phone">{listing.phoneNumber}</span>
+                            {listing.category === 'USED_LIST' && (
+                              <span style={{ fontSize: '0.75rem', color: 'var(--warning)', marginTop: '0.15rem', fontWeight: '500' }}>
+                                Bulk List Submission
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td data-label="Action">
                           <button
                             id={`whatsapp-btn-${listing.id}`}
                             className="whatsapp-btn"
@@ -351,127 +314,36 @@ export default function BuyerPortal() {
                   </tbody>
                 </table>
               </div>
-            )}
-          </section>
-        )}
 
-        {/* Recently Top-Searched Models Curation Grid */}
-        <section style={{ marginTop: '3rem' }}>
-          <h3 className="section-heading">
-            Recently Top-Searched Laptop Models
-          </h3>
-          <div className="catalog-grid" style={{ marginBottom: '2.5rem' }}>
-            {topSearched.map((model) => {
-              const activeListings = model.listings || [];
-              const inStockCount = activeListings.reduce((sum, item) => sum + item.quantity, 0);
-              const hasStock = inStockCount > 0;
-
-              return (
-                <div
-                  key={model.id}
-                  className="laptop-card"
-                  id={`top-card-${model.id}`}
-                  onClick={() => handleSelectModel(model)}
-                >
-                  <span className="card-brand">{model.brand}</span>
-                  <h3 className="card-name">{model.name}</h3>
-                  <p className="card-specs-summary">Featured inventory config from regional suppliers.</p>
-
-                  <div className="card-footer">
-                    <span className={`availability-tag ${!hasStock ? 'out-of-stock' : ''}`}>
-                      {hasStock ? `${activeListings.length} suppliers in stock` : 'Out of Stock'}
-                    </span>
-                    <span className="card-action-text">
-                      View Details
-                      <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                      </svg>
-                    </span>
-                  </div>
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem', marginTop: '2rem' }} id="pagination-controls">
+                  <button
+                    id="prev-page-btn"
+                    className="btn btn-secondary"
+                    disabled={currentPage === 1}
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    style={{ padding: '0.45rem 1rem', fontSize: '0.85rem' }}
+                  >
+                    Previous
+                  </button>
+                  <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <button
+                    id="next-page-btn"
+                    className="btn btn-secondary"
+                    disabled={currentPage === totalPages}
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    style={{ padding: '0.45rem 1rem', fontSize: '0.85rem' }}
+                  >
+                    Next
+                  </button>
                 </div>
-              );
-            })}
-          </div>
+              )}
+            </div>
+          )}
         </section>
-
-        {/* Collapsible Brand Accordions (Revealed via 'View All Models' toggle) */}
-        {showAllModels && (
-          <section style={{ marginTop: '2rem' }} id="all-models-accordion-section">
-            <h2 style={{ fontSize: '1.5rem', fontFamily: 'var(--font-display)', marginBottom: '1.5rem', fontWeight: '700' }}>
-              All Laptop Models Organized By Brand
-            </h2>
-
-            {loading ? (
-              <p className="text-center" style={{ padding: '4rem 0' }}>Loading laptop models...</p>
-            ) : brandsList.length === 0 ? (
-              <div className="empty-state">
-                <p>No brands found in the catalog.</p>
-              </div>
-            ) : (
-              <div>
-                {brandsList.map((brand) => {
-                  const brandModels = groupedCatalog[brand] || [];
-                  const isExpanded = !!expandedBrands[brand];
-
-                  return (
-                    <div key={brand} className="brand-accordion" id={`brand-accordion-${brand}`}>
-                      <div
-                        className="brand-header"
-                        id={`brand-header-${brand}`}
-                        onClick={() => toggleBrand(brand)}
-                      >
-                        <h3 className="brand-title">
-                          {brand}
-                          <span className="brand-count">{brandModels.length} models</span>
-                        </h3>
-                        <span className={`brand-chevron ${isExpanded ? 'expanded' : ''}`}>
-                          <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </span>
-                      </div>
-
-                      {isExpanded && (
-                        <div className="brand-content" id={`brand-content-${brand}`}>
-                          {brandModels.map((model) => {
-                            const activeListings = model.listings || [];
-                            const inStockCount = activeListings.reduce((sum, item) => sum + item.quantity, 0);
-                            const hasStock = inStockCount > 0;
-
-                            return (
-                              <div
-                                key={model.id}
-                                className="laptop-card"
-                                id={`laptop-card-${model.id}`}
-                                onClick={() => handleSelectModel(model)}
-                              >
-                                <span className="card-brand">{model.brand}</span>
-                                <h3 className="card-name">{model.name}</h3>
-                                <p className="card-specs-summary">Select model to view configurations.</p>
-
-                                <div className="card-footer">
-                                  <span className={`availability-tag ${!hasStock ? 'out-of-stock' : ''}`}>
-                                    {hasStock ? `${activeListings.length} suppliers in stock` : 'Out of Stock'}
-                                  </span>
-                                  <span className="card-action-text">
-                                    View Details
-                                    <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3">
-                                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                                    </svg>
-                                  </span>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-        )}
       </main>
 
       {/* Footer */}
