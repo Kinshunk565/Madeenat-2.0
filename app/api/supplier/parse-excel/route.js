@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import xlsx from 'xlsx';
+import * as xlsx from 'xlsx';
 import prisma from '@/lib/db';
 
 export async function POST(request) {

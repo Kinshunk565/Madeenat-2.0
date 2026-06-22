@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 
-export default function SupplierDashboard() {
+function SupplierDashboard() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [user, setUser] = useState(null);
@@ -1155,3 +1155,12 @@ export default function SupplierDashboard() {
     </div>
   );
 }
+
+export default function SupplierPage() {
+  return (
+    <Suspense fallback={<p className="text-center" style={{ padding: '6rem' }}>Authenticating session...</p>}>
+      <SupplierDashboard />
+    </Suspense>
+  );
+}
+
