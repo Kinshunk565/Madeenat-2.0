@@ -838,6 +838,14 @@ img {
   flex-direction: column;
 }
 
+/* Ensure forms inside modals are flex containers that fill the height, enabling body scrolling */
+.modal-content form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+
 @keyframes slideUp {
   from { opacity: 0; transform: translateY(100px); }
   to { opacity: 1; transform: translateY(0); }
