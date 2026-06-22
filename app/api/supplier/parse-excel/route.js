@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import * as xlsx from 'xlsx';
+import { read, utils } from 'xlsx';
 import prisma from '@/lib/db';
 
 export async function POST(request) {
@@ -14,12 +14,12 @@ export async function POST(request) {
     const buffer = Buffer.from(await file.arrayBuffer());
     
     // Parse using SheetJS
-    const workbook = xlsx.read(buffer, { type: 'buffer' });
+    const workbook = read(buffer, { type: 'buffer' });
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
     
     // Convert to JSON
-    const rows = xlsx.utils.sheet_to_json(worksheet, { defval: '' });
+    const rows = utils.sheet_to_json(worksheet, { defval: '' });
     
     if (rows.length === 0) {
       return NextResponse.json({ error: 'The uploaded file is empty.' }, { status: 400 });
