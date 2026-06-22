@@ -1,0 +1,77 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id          Int            @id @default(autoincrement())
+  email       String         @unique
+  password    String
+  role        String         // "ADMIN" | "SUPPLIER"
+  companyName String?
+  phoneNumber String?
+  address     String?
+  city        String?
+  country     String?
+  createdAt   DateTime       @default(now())
+  listings    StockListing[]
+}
+
+model LaptopModel {
+  id       Int            @id @default(autoincrement())
+  name     String         @unique
+  brand    String
+  listings StockListing[]
+}
+
+model StockListing {
+  id                  Int               @id @default(autoincrement())
+  modelId             Int
+  laptopModel         LaptopModel       @relation(fields: [modelId], references: [id])
+  cpu                 String
+  ram                 String?
+  ssd                 String?
+  gpu                 String
+  quantity            Int
+  phoneNumber         String            // Contact for inquiry
+  companyName         String            // Company name showing in listing
+  status              String            // "PENDING" | "APPROVED" | "REJECTED"
+  rejectionReason     String?
+  category            String            @default("USED_LAPTOP") // "USED_LAPTOP" | "USED_LIST"
+  isSold              Boolean           @default(false)
+  tempSessionToken    String?
+  supplierId          Int?
+  supplier            User?             @relation(fields: [supplierId], references: [id])
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  inquiries           Inquiry[]
+  eventLogs           ListingEventLog[]
+}
+
+model Inquiry {
+  id             Int          @id @default(autoincrement())
+  stockListingId Int
+  stockListing   StockListing @relation(fields: [stockListingId], references: [id])
+  buyerName      String?
+  buyerPhone     String?
+  message        String
+  createdAt      DateTime     @default(now())
+}
+
+model SearchLog {
+  id        Int      @id @default(autoincrement())
+  query     String
+  createdAt DateTime @default(now())
+}
+
+model ListingEventLog {
+  id             Int          @id @default(autoincrement())
+  stockListingId Int
+  stockListing   StockListing @relation(fields: [stockListingId], references: [id])
+  eventType      String       // "VIEW" | "CLICK"
+  createdAt      DateTime     @default(now())
+}
