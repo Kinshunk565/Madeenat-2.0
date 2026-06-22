@@ -62,7 +62,7 @@ export async function GET(request) {
   } catch (error) {
     console.error('Supplier listings GET Error:', error);
     return NextResponse.json(
-      { error: 'An unexpected error occurred.' },
+      { error: 'Supplier listings GET Error: ' + (error.message || String(error)) },
       { status: 500 }
     );
   }
@@ -377,7 +377,7 @@ export async function POST(request) {
   } catch (error) {
     console.error('Supplier listings POST Error:', error);
     return NextResponse.json(
-      { error: 'An unexpected error occurred during submission.' },
+      { error: 'Supplier listings POST Error: ' + (error.message || String(error)) },
       { status: 500 }
     );
   }
