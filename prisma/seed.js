@@ -69,9 +69,17 @@ async function main() {
 
   if (model1 && model2) {
     // Clean old listings from seed to prevent duplicates if seed rerun
-    await prisma.stockListing.deleteMany({
-      where: { supplierId: supplier.id }
+    // Must delete child records first (foreign key constraints)
+    const existingListings = await prisma.stockListing.findMany({
+      where: { supplierId: supplier.id },
+      select: { id: true }
     });
+    const listingIds = existingListings.map(l => l.id);
+    if (listingIds.length > 0) {
+      await prisma.listingEventLog.deleteMany({ where: { stockListingId: { in: listingIds } } });
+      await prisma.inquiry.deleteMany({ where: { stockListingId: { in: listingIds } } });
+      await prisma.stockListing.deleteMany({ where: { id: { in: listingIds } } });
+    }
 
     await prisma.stockListing.create({
       data: {
